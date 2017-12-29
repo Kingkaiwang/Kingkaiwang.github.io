@@ -1,0 +1,78 @@
+1.hashmap实现的接口——Map<K,V>, Cloneable, Serializable
+2.hashmap继承的父类——AbstractMap<K,V>
+3.hashmap的实现——数组、链表、红黑树
+3.hashmap的存储——key-value的结构，key是根据数据的key计算出hash值进行存储的
+4.hashmap的hash值计算——(key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16)计算出hash后与数组的长度-1进行与计算——(n - 1) & hash
+5.hashmap的属性
+/**
+* 默认初始容量 - 必须是2的幂次方 */
+static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // 16
+/**
+* 最大容量 */
+static final int MAXIMUM_CAPACITY = 1 << 30;
+/**
+* 当构造函数不指定时,默认(Hash表)装载因子。 */
+static final float DEFAULT_LOAD_FACTOR = 0.75f;
+/**
+* 链表->红黑树的阈值 */
+static final int TREEIFY_THRESHOLD = 8;
+/**
+* 红黑树->链表的阈值 */
+static final int UNTREEIFY_THRESHOLD = 6;
+/**
+* The smallest table capacity for which bins may be treeified.
+* (Otherwise the table is resized if too many nodes in a bin.)
+* Should be at least 4 * TREEIFY_THRESHOLD to avoid conflicts * between resizing and treeification thresholds.
+*/
+static final int MIN_TREEIFY_CAPACITY = 64;
+当超过这个阀值-1（8-1）的时候会进行树化操作——treeifyBin，如果此时的hashmap的长度小于64则进行扩容操作不进行树化操作
+/**
+* HashMap的修改次数 */
+transient int modCount; // fail-fast机制,下面有解释
+/**
+* 阈值 - 当实际大小超过临界值时,会进行扩容。threshold = capacity * loadFactor(注意这里的capacity与s
+ize的区别) */
+int threshold; // 默认情况下是12
+6.hashmap存储数据方法
+final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
+               boolean evict) {
+    Node<K,V>[] tab; Node<K,V> p; int n, i;
+    if ((tab = table) == null || (n = tab.length) == 0)
+        n = (tab = resize()).length;
+    if ((p = tab[i = (n - 1) & hash]) == null)
+        tab[i] = newNode(hash, key, value, null);
+    else {
+        Node<K,V> e; K k;
+        if (p.hash == hash &&
+            ((k = p.key) == key || (key != null && key.equals(k))))
+            e = p;
+        else if (p instanceof TreeNode)//树结构
+            e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+        else {
+            for (int binCount = 0; ; ++binCount) {
+                if ((e = p.next) == null) {//链表
+                    p.next = newNode(hash, key, value, null);
+                    if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                        treeifyBin(tab, hash);
+                    break;
+                }
+                if (e.hash == hash &&
+                    ((k = e.key) == key || (key != null && key.equals(k))))
+                    break;
+                p = e;
+            }
+        }
+        if (e != null) { // existing mapping for key key存在替换旧的值并将oldvalue返回
+            V oldValue = e.value;
+            if (!onlyIfAbsent || oldValue == null)
+                e.value = value;
+            afterNodeAccess(e);
+            return oldValue;
+        }
+    }
+    ++modCount;//修改次数+1,它是Java集合的一种错误检测机制。当多个线程对集合进行结构上的改变的操作时，有可能会产生fail-fast机制
+    if (++size > threshold)
+        resize();
+    afterNodeInsertion(evict);
+    return null;
+}
